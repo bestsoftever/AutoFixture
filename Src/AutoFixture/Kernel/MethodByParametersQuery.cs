@@ -20,7 +20,7 @@ namespace AutoFixture.Kernel
         public MethodByParametersCountQuery(object owner, string methodName, int parametersCount)
         {
             this.Owner = owner ?? throw new ArgumentNullException(nameof(owner));
-            this.MethodName = methodName;
+            this.MethodName = methodName ?? throw new ArgumentNullException(nameof(methodName));
             this.ParametersCount = parametersCount;
         }
 
@@ -49,10 +49,20 @@ namespace AutoFixture.Kernel
         /// </returns>
         public IEnumerable<IMethod> SelectMethods(Type type = default)
         {
-            var method = this.Owner.GetType().GetTypeInfo()
-                .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-                .Where(m => m.Name.EndsWith(this.MethodName) && m.GetParameters().Length == this.ParametersCount)
+            var typeInfo = this.Owner.GetType().GetTypeInfo();
+
+            var method = typeInfo.GetMethods(BindingFlags.Instance | BindingFlags.Public)
+                .Where(m => m.Name == this.MethodName && m.GetParameters().Length == this.ParametersCount)
                 .FirstOrDefault();
+
+            // If no public method found, try to find a private one.
+            if (method == null)
+            {
+                method = typeInfo
+                    .GetMethods(BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Where(m => m.Name.EndsWith($".{this.MethodName}") && m.GetParameters().Length == this.ParametersCount)
+                    .FirstOrDefault();
+            }
 
             return method == null
                 ? new IMethod[0]
